@@ -5,6 +5,7 @@ const url = require("url");
 const uuidv4 = require("uuid/v4");
 const DOMParser = require("xmldom").DOMParser;
 const xmlCrypto = require("xml-crypto");
+const https = require("https");
 
 async function load(file) {
 	try {
@@ -91,8 +92,40 @@ function signRequest(request, certPem) {
 	return request;
 }
 
-async function sendRequest(request) {
-	
+async function sendRequest(request, username, password, pem) {
+
+	return new Promise((resolve, reject) => {
+
+		const options = {
+			hostname: "lekar-soap.erecept.sukl.cz",
+			port: 443,
+			path: "/cuer/Lekar",
+			method: "POST",
+			key: pem,
+			cert: pem,
+			auth: `${username}:${password}`,
+			headers: {
+				"Content-Type": "application/soap+xml; charset=utf-8"
+			}
+		};
+
+		const req = https.request(options, (res) => {
+			console.log("statusCode:", res.statusCode);
+			console.log("headers:", res.headers);
+
+			res.on("data", (d) => {
+				process.stdout.write(d);
+			});
+		});
+
+		req.on("error", (e) => {
+			console.error(e);
+		});
+
+		req.end(request, "utf8");
+
+	});
+
 }
 
 async function start() {
@@ -104,8 +137,9 @@ async function start() {
 	let authPassword = await load("auth-password.txt");
 
 	let signedRequest = signRequest(request, certPerson);
-	
-	console.info(sendRequest(signRequest));
+
+	console.info(sendRequest(signedRequest, authUsername, authPassword, certSuklPem));
+	//console.info(signedRequest);
 }
 
 start().catch(console.error);
