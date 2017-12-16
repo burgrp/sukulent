@@ -1,6 +1,6 @@
 {
 	"name": "sukulent",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"author": "pb@drkake.cz",
 	"dependencies": {
 		"prettify-xml": "1.2.0",
