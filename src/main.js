@@ -1,7 +1,6 @@
 const fs = require("fs");
 const pro = require("util").promisify;
 const prettifyXml = require("prettify-xml");
-const url = require("url");
 const uuidv4 = require("uuid/v4");
 const DOMParser = require("xmldom").DOMParser;
 const xmlCrypto = require("xml-crypto");
@@ -109,17 +108,22 @@ async function sendRequest(request, username, password, pem) {
 			}
 		};
 
-		const req = https.request(options, (res) => {
-			console.log("statusCode:", res.statusCode);
-			console.log("headers:", res.headers);
+		const req = https.request(options, res => {
 
-			res.on("data", (d) => {
-				process.stdout.write(d);
+			reply = "";
+
+			res.on("data", d => {
+				reply += d.toString();
 			});
+
+			res.on("end", () => {
+				resolve(reply);
+			});
+
 		});
 
 		req.on("error", (e) => {
-			console.error(e);
+			reject(e);
 		});
 
 		req.end(request, "utf8");
@@ -128,18 +132,71 @@ async function sendRequest(request, username, password, pem) {
 
 }
 
+function removeSoapEnvelope(xml) {
+	let doc = new DOMParser().parseFromString(xml);
+	let soapBody = doc.getElementsByTagNameNS("http://schemas.xmlsoap.org/soap/envelope/", "Body")[0];
+	if (!soapBody) {
+		return xml;
+	}
+
+	for (let i = 0; i < soapBody.childNodes.length; i++) {
+		if (soapBody.childNodes[i].nodeType === 1) {
+			return soapBody.childNodes[i].toString();
+		}
+	}
+
+	throw "SOAP body v odpovědi neobsahuje žádný element";
+}
+
+function formatAsSoapError(error) {
+	
+	error = error.message || error;
+	
+	return `
+<soap:Fault xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<faultcode>soap:Client</faultcode>
+<faultstring>${error}</faultstring>
+</detail>
+</soap:Fault> 
+`;
+	 
+}
+
+async function saveReply(reply) {
+	await pro(fs.writeFile)("reply.xml", reply, "utf8");
+}
+
 async function start() {
 
-	let request = await load("request.xml");
-	let certPerson = await load("cert-person.pem");
-	let certSuklPem = await load("cert-sukl.pem");
-	let authUsername = await load("auth-username.txt");
-	let authPassword = await load("auth-password.txt");
+	let reply;
 
-	let signedRequest = signRequest(request, certPerson);
+	try {
 
-	console.info(sendRequest(signedRequest, authUsername, authPassword, certSuklPem));
-	//console.info(signedRequest);
+		console.info("Načítám data...");
+		
+		let request = await load("request.xml");
+		let certPerson = await load("cert-person.pem");
+		let certSuklPem = await load("cert-sukl.pem");
+		let authUsername = await load("auth-username.txt");
+		let authPassword = await load("auth-password.txt");
+
+		console.info("Podepisuji XML...");
+		let signedRequest = signRequest(request, certPerson);
+
+		console.info("Odesílám požadavek...");
+		reply = await sendRequest(signedRequest, authUsername, authPassword, certSuklPem);
+		reply = prettifyXml(removeSoapEnvelope(reply));
+
+		console.info("Ukládám odpověď...");
+		await saveReply(reply);
+
+		console.info("Hotovo");
+		
+	} catch (e) {
+		console.error(e);
+		reply = formatAsSoapError(e);
+	}
+	
 }
 
 start().catch(console.error);

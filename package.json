@@ -3,7 +3,6 @@
 	"version": "1.0.0",
 	"author": "pb@drkake.cz",
 	"dependencies": {
-		"http-debug": "^0.1.2",
 		"prettify-xml": "1.2.0",
 		"soap": "0.23.0",
 		"uuid": "3.1.0",
