@@ -158,7 +158,6 @@ function formatAsSoapError(error) {
 <soap:Fault xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
 <faultcode>soap:Client</faultcode>
 <faultstring>${error}</faultstring>
-</detail>
 </soap:Fault> 
 `;
 
