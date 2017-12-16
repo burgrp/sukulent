@@ -11,5 +11,8 @@
 	},
 	"scripts": {
 		"start": "node src/main.js"
+	},
+	"bin": {
+		"sukulent": "src/main.js"
 	}
 }

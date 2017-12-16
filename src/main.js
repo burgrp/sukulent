@@ -1,3 +1,5 @@
+#! /usr/bin/env node
+ 
 const fs = require("fs");
 const pro = require("util").promisify;
 const prettifyXml = require("prettify-xml");
@@ -8,7 +10,7 @@ const https = require("https");
 
 async function load(file) {
 	try {
-		return await pro(fs.readFile)(file, "utf8");
+		return (await pro(fs.readFile)(file, "utf8")).trim();
 	} catch (e) {
 		throw `Chyba čtení souboru ${file}. ${e.message}`;
 	}
