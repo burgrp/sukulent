@@ -176,7 +176,7 @@ async function start() {
 
 		console.info("Načítám data...");
 		
-		let request = await load("request.xml");
+		let request = await load("xrequest.xml");
 		let certPerson = await load("cert-person.pem");
 		let certSuklPem = await load("cert-sukl.pem");
 		let authUsername = await load("auth-username.txt");
@@ -189,15 +189,15 @@ async function start() {
 		reply = await sendRequest(signedRequest, authUsername, authPassword, certSuklPem);
 		reply = prettifyXml(removeSoapEnvelope(reply));
 
-		console.info("Ukládám odpověď...");
-		await saveReply(reply);
-
 		console.info("Hotovo");
 		
 	} catch (e) {
 		console.error(e);
 		reply = formatAsSoapError(e);
 	}
+	
+		console.info("Ukládám odpověď...");
+		await saveReply(reply);
 	
 }
 
