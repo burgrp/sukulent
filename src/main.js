@@ -9,6 +9,7 @@ const xmlCrypto = require("xml-crypto");
 const https = require("https");
 
 async function load(file) {
+	file = (process.env.FILES_PREFIX || "") + file;
 	try {
 		return (await pro(fs.readFile)(file, "utf8")).trim();
 	} catch (e) {
@@ -164,7 +165,8 @@ function formatAsSoapError(error) {
 }
 
 async function saveReply(reply) {
-	await pro(fs.writeFile)("reply.xml", reply, "utf8");
+	let file = (process.env.FILES_PREFIX || "") + "reply.xml";
+	await pro(fs.writeFile)(file, reply, "utf8");
 }
 
 async function start() {
@@ -188,8 +190,6 @@ async function start() {
 		reply = await sendRequest(signedRequest, authUsername, authPassword, certSuklPem);
 		reply = prettifyXml(removeSoapEnvelope(reply));
 
-		console.info("Hotovo");
-
 	} catch (e) {
 		console.error(e);
 		reply = formatAsSoapError(e);
@@ -198,6 +198,7 @@ async function start() {
 	console.info("Ukládám odpověď...");
 	await saveReply(reply);
 
+	console.info("Hotovo.");
 }
 
 start().catch(console.error);

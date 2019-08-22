@@ -1,8 +1,2 @@
-nbproject
+.vscode
 node_modules
-request.xml
-reply.xml
-cert-person.pem
-cert-sukl.pem
-auth-username.txt
-auth-password.txt
