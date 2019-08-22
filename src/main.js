@@ -7,9 +7,10 @@ const uuidv4 = require("uuid/v4");
 const DOMParser = require("xmldom").DOMParser;
 const xmlCrypto = require("xml-crypto");
 const https = require("https");
+const QRCode = require("qrcode");
+
 
 async function load(file) {
-	file = (process.env.FILES_PREFIX || "") + file;
 	try {
 		return (await pro(fs.readFile)(file, "utf8")).trim();
 	} catch (e) {
@@ -165,8 +166,22 @@ function formatAsSoapError(error) {
 }
 
 async function saveReply(reply) {
-	let file = (process.env.FILES_PREFIX || "") + "reply.xml";
-	await pro(fs.writeFile)(file, reply, "utf8");
+	await pro(fs.writeFile)("reply.xml", reply, "utf8");
+}
+
+async function saveQrCode(request, reply) {
+	let requestDoc = new DOMParser().parseFromString(request);
+	let platnostDo = requestDoc.getElementsByTagName("ZalozeniPredpisuDotaz")[0].getElementsByTagName("Doklad")[0].getElementsByTagName("PlatnostDo")[0].textContent;
+	platnostDo = platnostDo.replace(/-/g, "");
+
+	let replyDoc = new DOMParser().parseFromString(reply);
+	let replyNs = "http://www.sukl.cz/erp/201704";
+	let idDokladu = replyDoc.getElementsByTagNameNS(replyNs, "ZalozeniPredpisuOdpoved")[0].getElementsByTagNameNS(replyNs, "Doklad")[0].getElementsByTagNameNS(replyNs, "ID_Dokladu")[0].textContent
+	let qrText = `https://epreskripce.cz/erp?i=${idDokladu}&d=${platnostDo}`;
+
+	await QRCode.toFile("qr.png", qrText, {
+		type: "png"
+	});
 }
 
 async function start() {
@@ -189,6 +204,9 @@ async function start() {
 		console.info("Odesílám požadavek...");
 		reply = await sendRequest(signedRequest, authUsername, authPassword, certSuklPem);
 		reply = prettifyXml(removeSoapEnvelope(reply));
+
+		console.info("Ukládám QR...");
+		await saveQrCode(request, reply);
 
 	} catch (e) {
 		console.error(e);
