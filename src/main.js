@@ -1,18 +1,39 @@
 #! /usr/bin/env node
 
-const fs = require("fs");
-const pro = require("util").promisify;
 const prettifyXml = require("prettify-xml");
 const uuidv4 = require("uuid/v4");
 const DOMParser = require("xmldom").DOMParser;
 const xmlCrypto = require("xml-crypto");
 const https = require("https");
 const QRCode = require("qrcode");
+const { Writable } = require("stream");
+const Jimp = require("jimp");
+const fsPro = require("fs").promises;
 
+function streamToBuffer() {
+
+	let buffer = Buffer.alloc(0);
+	let resolve;
+	let promise = new Promise(r => resolve = r);
+
+	let stream = new Writable({
+		write(chunk, encoding, callback) {
+			buffer = Buffer.concat([buffer, chunk]);
+			callback();
+		},
+		final(callback) {
+			resolve(buffer);
+			callback();
+		}
+	});
+
+	stream.buffer = promise;
+	return stream;
+}
 
 async function load(file) {
 	try {
-		return (await pro(fs.readFile)(file, "utf8")).trim();
+		return (await fsPro.readFile(file, "utf8")).trim();
 	} catch (e) {
 		throw `Chyba čtení souboru ${file}. ${e.message}`;
 	}
@@ -166,22 +187,43 @@ function formatAsSoapError(error) {
 }
 
 async function saveReply(reply) {
-	await pro(fs.writeFile)("reply.xml", reply, "utf8");
+	await fsPro.writeFile("reply.xml", reply, "utf8");
 }
 
 async function saveQrCode(request, reply) {
+
+	let qrFile = "qr.jpg";
+
 	let requestDoc = new DOMParser().parseFromString(request);
 	let platnostDo = requestDoc.getElementsByTagName("ZalozeniPredpisuDotaz")[0].getElementsByTagName("Doklad")[0].getElementsByTagName("PlatnostDo")[0].textContent;
 	platnostDo = platnostDo.replace(/-/g, "");
 
 	let replyDoc = new DOMParser().parseFromString(reply);
 	let replyNs = "http://www.sukl.cz/erp/201704";
-	let idDokladu = replyDoc.getElementsByTagNameNS(replyNs, "ZalozeniPredpisuOdpoved")[0].getElementsByTagNameNS(replyNs, "Doklad")[0].getElementsByTagNameNS(replyNs, "ID_Dokladu")[0].textContent
-	let qrText = `https://epreskripce.cz/erp?i=${idDokladu}&d=${platnostDo}`;
+	let elZPD = replyDoc.getElementsByTagNameNS(replyNs, "ZalozeniPredpisuOdpoved")[0];
+	if (elZPD) {
+		console.info("Ukládám QR...");
 
-	await QRCode.toFile("qr.png", qrText, {
-		type: "png"
-	});
+		let idDokladu = elZPD.getElementsByTagNameNS(replyNs, "Doklad")[0].getElementsByTagNameNS(replyNs, "ID_Dokladu")[0].textContent
+		let qrText = `https://epreskripce.cz/erp?i=${idDokladu}&d=${platnostDo}`;
+
+		let pngStream = streamToBuffer();
+		await QRCode.toFileStream(pngStream, qrText, {
+			type: "png"
+		});
+
+		let pngBuffer = await pngStream.buffer;
+		let image = await Jimp.read(pngBuffer);
+		await image.writeAsync(qrFile);
+	} else {
+		try {
+			await fsPro.unlink(qrFile);
+		} catch (e) {
+			if (e.code !== "ENOENT") {
+				throw e;
+			}
+		}
+	}
 }
 
 async function start() {
@@ -205,7 +247,6 @@ async function start() {
 		reply = await sendRequest(signedRequest, authUsername, authPassword, certSuklPem);
 		reply = prettifyXml(removeSoapEnvelope(reply));
 
-		console.info("Ukládám QR...");
 		await saveQrCode(request, reply);
 
 	} catch (e) {
