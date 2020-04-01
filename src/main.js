@@ -86,7 +86,7 @@ function signRequest(request, certPem) {
 		message.appendChild(el);
 	}
 	addToMessage("ID_Zpravy", uuidv4());
-	addToMessage("Verze", "201704B");
+	addToMessage("Verze", "201704C");
 	addToMessage("Odeslano", new Date().toJSON());
 	addToMessage("SW_Klienta", "Sukulent0000");
 
