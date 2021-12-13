@@ -1,5 +1,5 @@
 name: Publish Package to npmjs
-on: master:
+on: master
 jobs:
   build:
     runs-on: ubuntu-latest
