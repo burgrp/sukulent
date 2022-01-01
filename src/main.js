@@ -1,5 +1,4 @@
 #! /usr/bin/env node
-
 const prettifyXml = require("prettify-xml");
 const uuidv4 = require("uuid/v4");
 const DOMParser = require("xmldom").DOMParser;
