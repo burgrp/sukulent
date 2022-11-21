@@ -112,7 +112,7 @@ function signRequest(request, certPem) {
 	request = sig.getSignedXml();
 
 	request = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Header/><soapenv:Body>${request}</soapenv:Body></soapenv:Envelope>`;	
-console.error(request);
+
 	return request;
 }
 

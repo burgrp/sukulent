@@ -1,6 +1,6 @@
 {
 	"name": "svakcina",
-	"version": "1.202201.1",
+	"version": "1.202201.2",
 	"author": "pb@drkake.cz",
 	"dependencies": {
 		"jimp": "^0.6.4",
