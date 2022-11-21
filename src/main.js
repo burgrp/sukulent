@@ -76,9 +76,9 @@ function signRequest(request, certPem) {
 	let doc = new DOMParser().parseFromString(request);
 	removeEmptyTexts(doc.documentElement);
 
-	let suklNs = "http://www.sukl.cz/erp/201704";
+	let commonNs = "http://www.sukl.cz/erp/common";
 
-	let message = doc.createElementNS(suklNs, "Zprava");
+	let message = doc.createElementNS(commonNs, "Zprava");
 	function addToMessage(elName, value) {
 		let el = doc.createElement(elName);
 		let txt = doc.createTextNode(value);
@@ -86,7 +86,7 @@ function signRequest(request, certPem) {
 		message.appendChild(el);
 	}
 	addToMessage("ID_Zpravy", uuidv4());
-	addToMessage("Verze", "201704E");
+	addToMessage("Verze", "202201A");
 	addToMessage("Odeslano", new Date().toJSON());
 	addToMessage("SW_Klienta", "Sukulent0000");
 
@@ -94,6 +94,7 @@ function signRequest(request, certPem) {
 	root.appendChild(message);
 
 	request = root.toString();
+	request = request.replace(" xmlns:cuzo=\"\"", "").replace(" xmlns:com=\"\"", "")
 
 	let sig = new xmlCrypto.SignedXml(false);
 
@@ -111,8 +112,8 @@ function signRequest(request, certPem) {
 	sig.computeSignature(request);
 	request = sig.getSignedXml();
 
-	request = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Header/><soapenv:Body>${request}</soapenv:Body></soapenv:Envelope>`;
-
+	request = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:cuzo="http://www.sukl.cz/erp/cuzo" xmlns:com="http://www.sukl.cz/erp/common"><soapenv:Header/><soapenv:Body>${request}</soapenv:Body></soapenv:Envelope>`;	
+console.error(request);
 	return request;
 }
 
@@ -121,15 +122,15 @@ async function sendRequest(request, username, password, pem) {
 	return new Promise((resolve, reject) => {
 
 		const options = {
-			hostname: "lekar-soap.erecept.sukl.cz",
+			hostname: "cuzo-soap.erecept.sukl.cz",
 			port: 443,
-			path: "/cuer/Lekar",
+			path: "/",
 			method: "POST",
 			key: pem,
 			cert: pem,
 			auth: `${username}:${password}`,
 			headers: {
-				"Content-Type": "application/soap+xml; charset=utf-8"
+				"Content-Type": "text/xml; charset=utf-8"
 			}
 		};
 
@@ -247,7 +248,7 @@ async function start() {
 		reply = await sendRequest(signedRequest, authUsername, authPassword, certSuklPem);
 		reply = prettifyXml(removeSoapEnvelope(reply));
 
-		await saveQrCode(request, reply);
+		//await saveQrCode(request, reply);
 
 	} catch (e) {
 		console.error(e);
