@@ -1,6 +1,6 @@
 {
-	"name": "sukulent",
-	"version": "1.2017016.1",
+	"name": "svakcina",
+	"version": "1.202201.1",
 	"author": "pb@drkake.cz",
 	"dependencies": {
 		"jimp": "^0.6.4",
@@ -15,6 +15,6 @@
 		"start": "node src/main.js"
 	},
 	"bin": {
-		"sukulent": "src/main.js"
+		"svakcina": "src/main.js"
 	}
 }

@@ -94,7 +94,6 @@ function signRequest(request, certPem) {
 	root.appendChild(message);
 
 	request = root.toString();
-	request = request.replace(" xmlns:cuzo=\"\"", "").replace(" xmlns:com=\"\"", "")
 
 	let sig = new xmlCrypto.SignedXml(false);
 
@@ -112,7 +111,7 @@ function signRequest(request, certPem) {
 	sig.computeSignature(request);
 	request = sig.getSignedXml();
 
-	request = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:cuzo="http://www.sukl.cz/erp/cuzo" xmlns:com="http://www.sukl.cz/erp/common"><soapenv:Header/><soapenv:Body>${request}</soapenv:Body></soapenv:Envelope>`;	
+	request = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Header/><soapenv:Body>${request}</soapenv:Body></soapenv:Envelope>`;	
 console.error(request);
 	return request;
 }
