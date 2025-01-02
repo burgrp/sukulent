@@ -1,5 +1,4 @@
 #! /usr/bin/env node
-
 const prettifyXml = require("prettify-xml");
 const uuidv4 = require("uuid/v4");
 const DOMParser = require("xmldom").DOMParser;
@@ -86,13 +85,14 @@ function signRequest(request, certPem) {
 		message.appendChild(el);
 	}
 	addToMessage("ID_Zpravy", uuidv4());
-	addToMessage("Verze", "201704E");
+	addToMessage("Verze", "202501A");
 	addToMessage("Odeslano", new Date().toJSON());
 	addToMessage("SW_Klienta", "Sukulent0000");
 
 	let root = doc.documentElement;
 	root.appendChild(message);
 
+	
 	request = root.toString();
 
 	let sig = new xmlCrypto.SignedXml(false);
