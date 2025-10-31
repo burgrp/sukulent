@@ -8,6 +8,8 @@ const QRCode = require("qrcode");
 const { Writable } = require("stream");
 const Jimp = require("jimp");
 const fsPro = require("fs").promises;
+const tls = require("tls");
+const crypto = require("crypto");
 
 function streamToBuffer() {
 
@@ -56,6 +58,100 @@ function extractCerts(cert) {
 	return result;
 }
 
+function extractPemBlocks(pem, predicate) {
+	let regex = /-----BEGIN ([^-]+)-----[\s\S]*?-----END \1-----/g;
+	let match;
+	let result = [];
+	while ((match = regex.exec(pem)) !== null) {
+		let type = match[1];
+		if (predicate(type)) {
+			result.push(match[0]);
+		}
+	}
+	return result;
+}
+
+function extractCertificatesWithHeaders(pem) {
+	return extractPemBlocks(pem, type => type === "CERTIFICATE");
+}
+
+function extractPrivateKeys(pem) {
+	return extractPemBlocks(pem, type => type.includes("PRIVATE KEY"));
+}
+
+function getCertificateInfos(pem) {
+	return extractCertificatesWithHeaders(pem).map(certPem => {
+		let certObj = new crypto.X509Certificate(certPem);
+		return {
+			pem: certPem,
+			subject: certObj.subject,
+			issuer: certObj.issuer,
+			publicKey: certObj.publicKey.export({ type: "spki", format: "pem" }),
+			isSelfSigned: certObj.subject === certObj.issuer
+		};
+	});
+}
+
+function buildCertificateChain(leaf, allCerts) {
+	let chain = [leaf];
+	let remaining = allCerts.filter(info => info !== leaf);
+	let currentIssuer = leaf.issuer;
+
+	for (let i = 0; i < allCerts.length; i++) {
+		let nextIndex = remaining.findIndex(info => info.subject === currentIssuer);
+		if (nextIndex === -1) {
+			break;
+		}
+		let next = remaining.splice(nextIndex, 1)[0];
+		chain.push(next);
+		if (next.isSelfSigned) {
+			break;
+		}
+		currentIssuer = next.issuer;
+	}
+
+	return chain;
+}
+
+function selectClientCredentials(pem) {
+	let keys = extractPrivateKeys(pem);
+	if (!keys.length) {
+		throw new Error("Soubor cert-sukl.pem neobsahuje soukromý klíč.");
+	}
+
+	let certInfos = getCertificateInfos(pem);
+
+	for (let key of keys) {
+		let keyPublic = crypto.createPublicKey(key).export({ type: "spki", format: "pem" });
+		let matchingCert = certInfos.find(info => info.publicKey === keyPublic);
+		if (matchingCert) {
+			let chain = buildCertificateChain(matchingCert, certInfos);
+			let chainPem = chain.map(info => info.pem);
+			return {
+				key,
+				certChain: chainPem,
+				leafSubject: matchingCert.subject
+			};
+		}
+	}
+
+	throw new Error("Soubor cert-sukl.pem neobsahuje certifikát odpovídající soukromému klíči.");
+}
+
+function gatherTrustedCerts(pems, excludeSubjects) {
+	let unique = new Map();
+
+	pems.filter(Boolean).forEach(pem => {
+		getCertificateInfos(pem).forEach(info => {
+			if (!excludeSubjects.has(info.subject)) {
+				unique.set(info.subject, info.pem);
+			}
+		});
+	});
+
+	return Array.from(unique.values());
+}
+
 function removeEmptyTexts(parent) {
 	let remove = [];
 	for (let i = 0; i < parent.childNodes.length; i++) {
@@ -92,7 +188,7 @@ function signRequest(request, certPem) {
 	let root = doc.documentElement;
 	root.appendChild(message);
 
-	
+
 	request = root.toString();
 
 	let sig = new xmlCrypto.SignedXml(false);
@@ -116,7 +212,12 @@ function signRequest(request, certPem) {
 	return request;
 }
 
-async function sendRequest(request, username, password, pem) {
+async function sendRequest(request, username, password, clientPem, trustedPemList = []) {
+	let clientCredentials = selectClientCredentials(clientPem);
+	let clientKey = clientCredentials.key;
+	let clientCerts = clientCredentials.certChain;
+	let excludeSubjects = new Set(clientCredentials.leafSubject ? [clientCredentials.leafSubject] : []);
+	let trustedCerts = gatherTrustedCerts([clientPem, ...trustedPemList], excludeSubjects);
 
 	return new Promise((resolve, reject) => {
 
@@ -125,8 +226,9 @@ async function sendRequest(request, username, password, pem) {
 			port: 443,
 			path: "/cuer/Lekar",
 			method: "POST",
-			key: pem,
-			cert: pem,
+			key: clientKey,
+			cert: clientCerts.join("\n"),
+			ca: Array.from(new Set([...tls.rootCertificates, ...trustedCerts])),
 			auth: `${username}:${password}`,
 			headers: {
 				"Content-Type": "application/soap+xml; charset=utf-8"
@@ -181,7 +283,7 @@ function formatAsSoapError(error) {
 <soap:Fault xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
 <faultcode>soap:Client</faultcode>
 <faultstring>${error}</faultstring>
-</soap:Fault> 
+</soap:Fault>
 `;
 
 }
@@ -244,7 +346,7 @@ async function start() {
 		let signedRequest = signRequest(request, certPerson);
 
 		console.info("Odesílám požadavek...");
-		reply = await sendRequest(signedRequest, authUsername, authPassword, certSuklPem);
+		reply = await sendRequest(signedRequest, authUsername, authPassword, certSuklPem, [certSuklPem, certPerson]);
 		reply = prettifyXml(removeSoapEnvelope(reply));
 
 		await saveQrCode(request, reply);
@@ -261,5 +363,3 @@ async function start() {
 }
 
 start().catch(console.error);
-
-
